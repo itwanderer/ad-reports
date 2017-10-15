@@ -66,7 +66,7 @@ ForEach ($Mgr in $Managers) {
 
     $drMemberHash = @{}    
     $DirectReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName
-    $drMemberHash = Process-Reports -List $DirectReports -Group "$($Mgr.SamAccountName)-DirectReports"
+    $drMemberHash = Process-Reports -List $DirectReports -Group "$($Mgr.samAccountName)-DirectReports"
     
     
     $arMemberHash = @{}
