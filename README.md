@@ -3,17 +3,21 @@
 get-help .\reports.ps1 -det
 
 NAME
+
     .\reports.ps1
 
 SYNOPSIS
+
     Creates and updates direct and all report (indirect) groups for managers based on directReports attribute
 
 
 SYNTAX
+
     .\reports.ps1 [-update] [<CommonParameters>]
 
 
 DESCRIPTION
+
     This script performs the following:
 
     1.  Generates a list of direct reports
@@ -29,6 +33,7 @@ DESCRIPTION
 
 
 PARAMETERS
+
     -update [<SwitchParameter>]
     
         Boolean switch to indicate if group membershop should be update. Script runs in report mode otherwise
@@ -58,6 +63,7 @@ PARAMETERS
 
 
 REMARKS
+
     To see the examples, type: "get-help C:\Users\Administrator\Documents\reports.ps1 -examples".
     For more information, type: "get-help C:\Users\Administrator\Documents\reports.ps1 -detailed".
     For technical information, type: "get-help C:\Users\Administrator\Documents\reports.ps1 -full".
