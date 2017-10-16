@@ -29,7 +29,7 @@ DESCRIPTION
     6.  Produces a report comparing current group members vs. membership based on directReports attribute and user
     state (enabled or disabled)
 
-    Mote:  The script runs in report mode when -update argument is not specified
+    Note:  The script runs in report mode when -update argument is not specified
 
 
 PARAMETERS
