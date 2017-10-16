@@ -2,7 +2,7 @@
     
 .SYNOPSIS
 
-Creates amd updates direct and all report (indirect) groups for managers,i.e. users with populated directReports attribute
+Creates and updates direct and all report (indirect) groups for managers based on directReports attribute
 
 .DESCRIPTION
 
