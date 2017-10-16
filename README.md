@@ -30,6 +30,7 @@ DESCRIPTION
 
 PARAMETERS
     -update [<SwitchParameter>]
+    
         Boolean switch to indicate if group membershop should be update. Script runs in report mode otherwise
 
     <CommonParameters>
