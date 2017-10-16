@@ -1,3 +1,13 @@
+[CmdletBinding()]
+Param(
+    [Switch]$update
+)
+
+If ($PSBoundParameters['Debug'])  {
+	$DebugPreference = 'Continue'
+}
+
+
 Function Generate-Reports {
 	Param(
 		[String]$ManagerDN,
@@ -33,7 +43,7 @@ Function Generate-Reports {
 Function Process-Reports {
     Param(
         $List,
-        $Group
+        $GroupName
     )
     
     $MemberHash = @{}
@@ -41,8 +51,8 @@ Function Process-Reports {
     $EnabledMembers = $null
 
     $ReportState = $List | Group-Object Enabled| Sort-Object Name -Descending
-    Write-Host "`n$($Group)"
-    Write-Host "    Total Members: $($List.sAMAccountName.Count)"
+    Write-Host "`n$($GroupName)"
+    Write-Host "    Total Members (per directReports attrib): $($List.sAMAccountName.Count)"
     ForEach ($State in $ReportState) {
         If ($State.name -eq "True") { 
             Write-Host "      Enabled Members: $($State.Count)"
@@ -56,24 +66,67 @@ Function Process-Reports {
         }
         
     }
+    $GroupMembers = Get-ADGroupMember -Identity $GroupName
+    Write-Host "    Total Members (current membership): $($GroupMembers.sAMAccountName.count)"
     return $MemberHash
 
 }
 
-$Managers = Get-ADUser -LDAPFilter "(&(objectclass=user)(directreports=*))"
+Function Update-GroupMembership {
 
-ForEach ($Mgr in $Managers) {
+    Param (
+        $MemberHash,
+        $GroupName
 
-    $drMemberHash = @{}    
-    $DirectReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName
-    $drMemberHash = Process-Reports -List $DirectReports -Group "$($Mgr.samAccountName)-DirectReports"
-    
-    
-    $arMemberHash = @{}
-    $AllReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName -Recursive
-    $arMemberHash = Process-Reports -List $AllReports -Group "$($Mgr.SamAccountName)-AllReports"
-    #use $hash.ContainsKey("key) to check for key existence since it is possible that only one key exists
-    #use $hash.Get_Item("key") to get value for associated key
+
+    )
+
+ 
+    If ($MemberHash.ContainsKey("Enabled")) {
+        Write-Host "Adding members to $($GroupName)"
+        Add-ADGroupMember -Identity $GroupName -Members $MemberHash.Get_Item("Enabled").sAMAccountName -Confirm:$False
+    }
+    If ($MemberHash.ContainsKey("Disabled")) {
+        Write-Host "Removing group members from $($GroupName)"
+        Remove-ADGroupMember -Identity $GroupName -Members $MemberHash.Get_Item("Disabled").sAMAccountName -Confirm:$False
+    }
+
+
     
 }
+
+Function Main {
+
+    $Managers = Get-ADUser -LDAPFilter "(&(objectclass=user)(directreports=*))"
+
+    ForEach ($Mgr in $Managers) {
+
+        $drMemberHash = @{}    
+        $DirectReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName
+        $drMemberHash = Process-Reports -List $DirectReports -Group "$($Mgr.SamAccountName)-DirectReports"
+    
+    
+        $arMemberHash = @{}
+        $AllReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName -Recursive
+        $arMemberHash = Process-Reports -List $AllReports -Group "$($Mgr.SamAccountName)-AllReports"
+        #use $hash.ContainsKey("key) to check for key existence since it is possible that only one key exists
+        #use $hash.Get_Item("key") to get value for associated key
+
+        If ($update) {
+
+            Write-Host "Updating group membership for $($Mgr.SamAccountName)-DirectReports"
+            Update-GroupMembership -MemberHash $drMemberHash -GroupName "$($Mgr.SamAccountName)-DirectReports"
+
+            Write-Host "Updating group membership for $($Mgr.SamAccountName)-AllReports"
+            Update-GroupMembership -MemberHash $arMemberHash -GroupName "$($Mgr.SamAccountName)-AllReports"
+
+
+
+        }
+    
+    }
+
+}
+
+Main
 
