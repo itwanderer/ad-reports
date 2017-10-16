@@ -35,8 +35,9 @@ DESCRIPTION
 PARAMETERS
 
     -update [<SwitchParameter>]
-    
-        Boolean switch to indicate if group membershop should be update. Script runs in report mode otherwise
+  
+        Boolean switch to indicate if group membership should be updated. 
+        Script runs in report mode without this parameter
 
     <CommonParameters>
         This cmdlet supports the common parameters: Verbose, Debug,
