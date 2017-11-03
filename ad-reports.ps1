@@ -19,7 +19,7 @@ This script performs the following:
 
 Mote:  The script runs in report mode when -update argument is not specified
 
-.PARAMETER config
+.PARAMETER ini
 
 json formated configuration file
 
@@ -34,14 +34,14 @@ Script runs in report mode without this parameter.
 
 To produce a report 
 
-.\reports.ps1 -config reports_cfg.json
+.\reports.ps1 -ini reports_cfg.json
 
 .EXAMPLE
 
 
 To update group memberships
 
-.\reports.ps1 -update -config reports_cfg.json
+.\reports.ps1 -update -ini reports_cfg.json
 
 
 .NOTES 
@@ -65,18 +65,16 @@ TODO:
 
 [CmdletBinding()]
 Param(
-<#
-    Parameter[(Mandatory=$True)]
-    [ValidateNotNull]
+    [Parameter(Mandatory=$True)]
     [ValidateScript({If (Test-Path $_) {
             $True
         } 
         Else {
-            Throw "Config file does not exist"
+            $msg = "Configuration file, {0}, does not exist!  Exiting script..." -f $_
+            Throw $msg
         }
         })]
-#>
-    [String]$config,
+    [String]$ini,
     [Switch]$update
 
 )
@@ -109,15 +107,15 @@ Function Log-ScriptStart {
     Logger -File $LogPath -LogContent $lc
     $lc = "Domain DN: {0}" -f $Domain_DN
     Logger -File $LogPath -LogContent $lc
-    $lc = "Group OU DN: {0}" -f $GroupBaseOU
+    $lc = "Group OU DN: {0}" -f $Group_BaseOu
     Logger -File $LogPath -LogContent $lc
-    $lc = "Group DirectReports Suffix: {0}" -f $GROUP_DIRECTREPORTS_SUFFIX
+    $lc = "Group DirectReports Suffix: {0}" -f $Config.Group_Suffix_DirectReports
     Logger -File $LogPath -LogContent $lc
-    $lc = "Group AllReports Suffix: {0}" -f $GROUP_ALLREPORTS_SUFFIX
+    $lc = "Group AllReports Suffix: {0}" -f $Config.Group_Suffix_AllReports
     Logger -File $LogPath -LogContent $lc
-    $lc = "User OU DN: {0}" -f $UserBaseOU
+    $lc = "User OU DN: {0}" -f $User_BaseOu
     Logger -File $LogPath -LogContent $lc
-    $lc = "User Search Filter: {0}" -f $USER_FILTER
+    $lc = "Manager Search Filter: {0}" -f $Config.Manager_Filter
     Logger -File $LogPath -LogContent $lc
 <#
     $lc = "Transcript File: {0}" -f $TranscriptFile
@@ -210,12 +208,12 @@ Function Process-Reports {
     If ((Get-ADGroup -Filter {Samaccountname -eq $GroupName}) -ne $null) {
         $GroupMembers = Get-ADGroupMember -Identity $GroupName
         $msg = "`tTotal Reports (current group members): {0}" -f $GroupMembers.sAMAccountName.count
-   }
-   Else {
+    }
+    Else {
         $msg = "`t{0} is not in AD yet" -f $GroupName
-   }
-   Logger -File $LogPath -LogContent $msg
-   return $MemberHash
+    }
+    Logger -File $LogPath -LogContent $msg
+    return $MemberHash
 
 }
 
@@ -243,7 +241,7 @@ Function Create-Group {
     $Error.Clear()
     Try {
         New-ADGroup @Arguments
-        $msg = "{0}: Success creating group" -f $Name
+        $msg = "{0}: Successfully created group" -f $Name
     }
     Catch {
         $msg = "{0}: {1} ; {2} error, {3} {4} ; {5}" -f `
@@ -271,14 +269,19 @@ Function Update-GroupMembership {
  
     $GroupMembers = Get-ADGroupMember $GroupName | Select-Object -ExpandProperty DistinguishedName
 
-    #TODO: Error checking using try .... catch
     If ($MemberHash.ContainsKey("Enabled")) {
         $msg = "{0}: Checking if enabled members need to be added to group" -f $GroupName
         Logger -File $LogPath -LogContent $msg
         $MissingMembers = $Memberhash.Enabled.DistinguishedName | Where-Object {$GroupMembers -notcontains $_}
         If ($MissingMembers.Count -gt 0) {
-           $msg = "{0}: There are {1} enabled members to add" -f $GroupName, $MissingMembers.Count
-           Logger -File $LogPath -LogContent $msg
+            $msg = "{0}: There are {1} enabled members to add" -f $GroupName, $MissingMembers.Count
+            Logger -File $LogPath -LogContent $msg
+            $msg = "{0}: These users will be added" -f $GroupName
+            Logger -File $LogPath -LogContent $msg
+            ForEach ($entry in $MissingMembers) {
+                $msg = "{0}: Member to add ==> {1}" -f $GroupName, $entry
+                Logger -File $LogPath -LogContent $msg
+            }
             Try {
                 $msg = "{0}: Adding group members" -f $GroupName
                 Logger -File $LogPath -LogContent $msg
@@ -299,7 +302,7 @@ Function Update-GroupMembership {
             } 
         }
         Else {
-            $msg = "{0}: No new members to add to  group" -f $GroupName
+            $msg = "{0}: No new members to add" -f $GroupName
             Logger -File $LogPath -LogContent $msg
 
         }
@@ -311,6 +314,10 @@ Function Update-GroupMembership {
         If ($MembersToRemove.Count -gt 0) {
            $msg = "{0}: There are {1} enabled members to remove" -f $GroupName, $MembersToRemove.Count
            Logger -File $LogPath -LogContent $msg
+           ForEach ($entry in $MembersToRemove) {
+               $msg = "{0}: Member to remove ==> {1}" -f $GroupName, $entry
+               Logger -File $LogPath -LogContent $msg
+           }
            Try {
                 $msg = "{0}: Removing enabled users from group" -f $GroupName
                 Logger -File $LogPath -LogContent $msg
@@ -337,7 +344,6 @@ Function Update-GroupMembership {
 
     }
 
-    #TODO: Error checking using try .... catch
     If ($MemberHash.ContainsKey("Disabled")) {
         $msg = "{0}: Checking if disabled users need to be removed from  group" -f $GroupName
         Logger -File $LogPath -LogContent $msg
@@ -345,6 +351,10 @@ Function Update-GroupMembership {
         If ($DisabledMembersToRemove.Count -gt 0) {
             $msg = "{0}: There are {1} disabled members to remove" -f $GroupName, $DisabledMembersToRemove.Count
             Logger -File $LogPath -LogContent $msg
+            ForEach ($entry in $DisabledMembersToRemove) {
+                $msg = "{0}: Disabled Member to remove ==> {1}" -f $GroupName, $entry
+                 Logger -File $LogPath -LogContent $msg
+            }
             Try {
                 $msg = "{0}: Removing disabled group members" -f $GroupName
                 Logger -File $LogPath -LogContent $msg
@@ -389,32 +399,17 @@ $GROUP_MEMBER_REMOVE_SUCCESS = 104
 $GROUP_MEMBER_REMOVE_ERROR = 105
 
 
-#TODO: Store Constant Vars in a JSON file
-#Constant Variables
-$GROUP_RB = 'OU=Reporting Structure,OU=Groups,OU=Managed'
-$GROUP_ALLREPORTS_SUFFIX = '-AllReports'
-$GROUP_DIRECTREPORTS_SUFFIX = '-DirectReports'
-$USER_RB = 'OU=Users,OU=Managed'
-$USER_FILTER = '(&(objectclass=user)(directReports=*))'
-$SEARCH_SCOPE = 'subtree'
-$LOG_DIR = 'Log'
-$LOGFILE_SUFFIX = '_Log.log'
-$TRANSCRIPT_SUFFIX = '_Transcript.log'
-
-$CONFIG_FILE = '.\config\reports_config.json'
-
 #Read config file
-$config = Get-Content -Raw -Path $CONFIG_FILE | ConvertFrom-Json
+$Config = Get-Content -Raw -Path $ini | ConvertFrom-Json
 
 
 #Dynamic Variables
 $Domain_DN = (Get-ADRootDSE).DefaultNamingContext
 
 #Constructed Variables
-$GroupBaseOU = "{0},{1}" -f $GROUP_RB, $Domain_DN
-$UserBaseOU = "{0},{1}" -f $USER_RB, $Domain_DN
-$LogPath = $PSCommandPath -replace   '.ps1$', $LOGFILE_SUFFIX
-#$TranscriptFile = $PSCommandPath -replace   '.ps1$', $TRANSCRIPT_SUFFIX
+$Group_BaseOu = "{0},{1}" -f $Config.Group_Ou_Rdn, $Domain_DN
+$User_BaseOu = "{0},{1}" -f $Config.User_Ou_Rdn, $Domain_DN
+$LogPath = $PSCommandPath -replace   '.ps1$', $Config.LogFile_Suffix
 
 #if (Test-Path $TranscriptFile) { Rename-LogFile -FileName $TranscriptFile }
 if (Test-Path $LogPath) { Rename-LogFile -FileName $LogPath }
@@ -424,7 +419,7 @@ if (Test-Path $LogPath) { Rename-LogFile -FileName $LogPath }
 Log-ScriptStart
 
 #TODO: Add error handling for search below
-$Managers = Get-ADUser -LDAPFilter $USER_FILTER -SearchBase $UserBaseOU
+$Managers = Get-ADUser -LDAPFilter $Config.Manager_Filter -SearchBase $User_BaseOu
 
 ForEach ($Mgr in $Managers) {
 
@@ -437,36 +432,35 @@ ForEach ($Mgr in $Managers) {
     $drMemberHash = @{}
     $DirectReports = $null    
     $DirectReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName
-    $drMemberHash = Process-Reports -List $DirectReports -Group "$($Mgr.SamAccountName)-DirectReports"
+    $DirectReportsGroup = $Mgr.SamAccountName + $Config.Group_Suffix_DirectReports
+    $drMemberHash = Process-Reports -List $DirectReports -Group $DirectReportsGroup
 
 
     $arMemberHash = @{}
     $AllReports = $null
     $AllReports = Generate-Reports -ManagerDN $Mgr.DistinguishedName -Recursive
-    $arMemberHash = Process-Reports -List $AllReports -Group "$($Mgr.SamAccountName)-AllReports"
+    $AllReportsGroup = $Mgr.SamAccountName + $Config.Group_Suffix_AllReports
+    $arMemberHash = Process-Reports -List $AllReports -Group $AllReportsGroup
 
     If ($update) {
 
         #Direct Reports group processing
-        $DirectReportsGroup = $Mgr.SamAccountName + $GROUP_DIRECTREPORTS_SUFFIX
-        $AllReportsGroup = $Mgr.SamAccountName + $GROUP_ALLREPORTS_SUFFIX
-
         If ((Get-ADGroup -Filter {sAMAccountName -eq $DirectReportsGroup}) -eq $null) {
             $msg = "{0}: Group does not exist, calling function to create" -f $DirectReportsGroup
             Logger -File $LogPath -LogContent $msg
-            Create-Group -Name $DirectReportsGroup -Base $GroupBaseOU
+            Create-Group -Name $DirectReportsGroup -Base $Group_BaseOu
         } 
 
         $msg = "{0}: Reconciling group membership" -f $DirectReportsGroup
         Logger -File $LogPath -LogContent $msg
         Update-GroupMembership -MemberHash $drMemberHash -GroupName $DirectReportsGroup
 
-        #Full Reports group processing
+        #All Reports group processing
         If ((Get-ADGroup -Filter {sAMAccountName -eq $AllReportsGroup}) -eq $null) {
             
             $msg = "{0}: Group does not exist, calling function to create" -f $AllReportsGroup
             Logger -File $LogPath -LogContent $msg
-            Create-Group -Name $AllReportsGroup -Base $GroupBaseOU
+            Create-Group -Name $AllReportsGroup -Base $Group_BaseOu
         } 
 
         $msg = "{0}: Reconciling group membership" -f $AllReportsGroup
