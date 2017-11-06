@@ -105,9 +105,13 @@ Function Log-ScriptStart {
 
     $lc = "================Starting Script================="
     Logger -File $LogFilePath -LogContent $lc
+    $lc = "Script Full Path: {0}" -f $PSCommandPath
+    Logger -File $LogFilePath -LogContent $lc
     $lc = "Script Dir: {0}" -f $PSScriptRoot
     Logger -File $LogFilePath -LogContent $lc
-    $lc = "Script: {0}" -f $PSCommandPath
+    $lc = "User: {0}\{1}" -f $Env:USERDOMAIN, $Env:USERNAME
+    Logger -File $LogFilePath -LogContent $lc
+    $lc = "Computer Name: {0}" -f $Env:COMPUTERNAME
     Logger -File $LogFilePath -LogContent $lc
     $lc = "Domain DN: {0}" -f $Domain_DN
     Logger -File $LogFilePath -LogContent $lc
@@ -158,8 +162,14 @@ Function Generate-Reports {
 	)
     $LdapFilter = "(&(objectclass=user)(manager=" + $managerDN + "))"
     #TODO: Add error checking for Get-ADUser
-	$DirectReports = Get-ADUser -LDAPFilter $LdapFilter -pro directReports
-    if ($DirectReports -eq $null) { continue; }
+    $Error.Clear()
+    Try {
+	    $DirectReports = Get-ADUser -LDAPFilter $LdapFilter -pro directReports
+    }
+    Catch {
+
+    }
+    If ($DirectReports -eq $null) { continue; }
     $AllReports += $DirectReports
 
     If ($recursive) {
@@ -167,7 +177,7 @@ Function Generate-Reports {
         ForEach ($entry in $DirectReports) {
              If ($entry.DirectReports -gt 0) {
                 If ($entry.distinguishedname -eq $managerDN) {
-                    $msg = "`tCircular manager reference, {0} reports to {0}, skipping to avoid loop" -f $entry.name
+                    $msg = "`tCircular manager reference, {0} reports to {0}, skipping to avoid loop" -f $entry.sAMAccountName
                     Logger -File $LogFilePath -LogContent $msg
                     Continue
                 }
@@ -371,9 +381,7 @@ Function Update-GroupMembership {
             }
             Catch {
                 $msg = "{0}: {1} ; {2} error, {3} {4} ; {5}" -f `
-                    $GroupName, `
                     $Error.ScriptStackTrace, `
-                    $Error.Categoryinfo.Activity, `
                     $Error.Categoryinfo.TargetType, `
                     $Error.CategoryInfo.Category, `
                     $Error.Exception.Message
@@ -397,6 +405,8 @@ Function Update-GroupMembership {
 #EndRegion
 
 #Region Main
+
+$StopWatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 #initialize status codes
 $GROUP_CREATE_SUCCESS = 100
@@ -441,7 +451,22 @@ Log-ScriptStart
 
 
 #TODO: Add error handling for search below
-$Managers = Get-ADUser -LDAPFilter $Config.Manager_Filter -SearchBase $User_BaseOu
+$Error.Clear()
+Try {
+    $Managers = Get-ADUser -LDAPFilter $Config.Manager_Filter -SearchBase $User_BaseOu
+}
+Catch {
+#    Throw
+    $msg = "{0} : {1} error, {2} {3} ; {4}" -f `
+            $Error.ScriptStackTrace, `
+            $Error.Categoryinfo.Activity, `
+            $Error.Categoryinfo.TargetType, `
+            $Error.CategoryInfo.Category, `
+            $Error.Exception.Message
+
+    Write-Host $msg
+    Exit
+}
 
 $lc = "There are {0} users with direct reports" -f $Managers.Count
 Logger -File $LogFilePath -LogContent $lc
@@ -498,8 +523,11 @@ ForEach ($Mgr in $Managers) {
 
 }
 
+$StopWatch.Stop()
+$lc = "Script Duration: {0} ms" -f $StopWatch.Elapsed.Milliseconds
+Logger -File $LogFilePath -LogContent $lc
 Logger -File $LogFilePath -LogContent "================Completed Script================="
-
+<#
 $EventLogEntry = @{  "LogName" = $Config.EventLog_Name
                      "Source" = $Config.EventLog_Source
                      "EntryType" = "Information"
@@ -514,7 +542,7 @@ Try {
 }
 Catch {
 #    Throw
-    $msg = "{0} : {1} ; {2} error, {3} {4} ; {5}" -f `
+    $msg = "{0} : {1} error, {2} {3} ; {4}" -f `
             $GroupName, `
             $Error.ScriptStackTrace, `
             $Error.Categoryinfo.Activity, `
@@ -524,8 +552,9 @@ Catch {
 
 }
 Finally {
-    Write-Host $msg
+    Write-Host $msg -ForegroundColor Green
 }
+#>
 
 #Stop-Transcript
 #EndRegion
