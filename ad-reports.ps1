@@ -135,6 +135,29 @@ Function Log-ScriptStart {
 #>
 }
 
+
+Function Log-ScriptEnd {
+
+    $lc = "------------------------------------------------"
+    Logger -File $LogFilePath -LogContent $lc
+
+    $lc = "Total Number of Managers: {0}" -f $Managers.Count
+    Logger -File $LogFilePath -LogContent $lc
+
+    If ($update) {
+        $lc = "Total Number of New Direct Reports Groups Created: {0}" -f $CountDrGroupCreations
+        Logger -File $LogFilePath -LogContent $lc
+        $lc = "Total Number of New All Reports Groups Created: {0}" -f $CountArGroupCreations
+        Logger -File $LogFilePath -LogContent $lc
+    }
+
+    $StopWatch.Stop()
+    $lc = "Script Duration: {0} ms" -f $StopWatch.Elapsed.Milliseconds
+    Logger -File $LogFilePath -LogContent $lc
+    Logger -File $LogFilePath -LogContent "================Completed Script================="
+
+}
+
 Function Rename-LogFile {
 
     Param (
@@ -471,6 +494,9 @@ Catch {
 $lc = "There are {0} users with direct reports" -f $Managers.Count
 Logger -File $LogFilePath -LogContent $lc
 
+$CountDrGroupCreations = 0
+$CountArGroupCreations = 0
+
 ForEach ($Mgr in $Managers) {
 
     $ProgressParms = @{
@@ -499,6 +525,7 @@ ForEach ($Mgr in $Managers) {
             $msg = "{0}: Group does not exist, calling function to create" -f $DirectReportsGroup
             Logger -File $LogFilePath -LogContent $msg
             Create-Group -Name $DirectReportsGroup -Base $Group_BaseOu
+            $CountDrGroupCreations++
         } 
 
         $msg = "{0}: Reconciling group membership" -f $DirectReportsGroup
@@ -511,6 +538,7 @@ ForEach ($Mgr in $Managers) {
             $msg = "{0}: Group does not exist, calling function to create" -f $AllReportsGroup
             Logger -File $LogFilePath -LogContent $msg
             Create-Group -Name $AllReportsGroup -Base $Group_BaseOu
+            $CountArGroupCreations++
         } 
 
         $msg = "{0}: Reconciling group membership" -f $AllReportsGroup
@@ -523,10 +551,9 @@ ForEach ($Mgr in $Managers) {
 
 }
 
-$StopWatch.Stop()
-$lc = "Script Duration: {0} ms" -f $StopWatch.Elapsed.Milliseconds
-Logger -File $LogFilePath -LogContent $lc
-Logger -File $LogFilePath -LogContent "================Completed Script================="
+
+Log-ScriptEnd
+
 <#
 $EventLogEntry = @{  "LogName" = $Config.EventLog_Name
                      "Source" = $Config.EventLog_Source
