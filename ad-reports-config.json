@@ -1,0 +1,13 @@
+{
+   “Group_Ou_Rdn” : “OU=Reporting Structure,OU=Groups”,
+   “Group_Suffix_AllReports” : “-AllReports”,
+   “Group_Suffix_DirectReports” : “-DirectReports”,
+   “User_Ou_Rdn” : “OU=Users,OU=Managed”,
+   “Manager_Filter” : “(&(objectclass=user)(directReports=*))“,
+   “LogDir” : “Log”,
+   “LogFile_Suffix” : “_Log.log”,
+   “Transcript_Suffix” : “_Transcript.log”,
+   “EventLog_Name” : “Application”,
+   “EventLog_Source” : “YourAppLogNameHere”
+
+}
